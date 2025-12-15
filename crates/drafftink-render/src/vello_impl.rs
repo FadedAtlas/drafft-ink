@@ -444,6 +444,23 @@ impl VelloRenderer {
         }
     }
 
+    /// Render a path with stroke only (no fill) - used for lines and arrows.
+    fn render_stroke_only(&mut self, path: &BezPath, style: &ShapeStyle, transform: Affine) {
+        let roughness = style.sloppiness.roughness();
+        let seed = style.seed;
+
+        if roughness > 0.0 {
+            let stroke = Stroke::new(style.stroke_width);
+            let path1 = apply_hand_drawn_effect(path, roughness, self.zoom, seed, 0);
+            self.scene.stroke(&stroke, transform, style.stroke(), None, &path1);
+            let path2 = apply_hand_drawn_effect(path, roughness, self.zoom, seed, 1);
+            self.scene.stroke(&stroke, transform, style.stroke(), None, &path2);
+        } else {
+            let stroke = Stroke::new(style.stroke_width);
+            self.scene.stroke(&stroke, transform, style.stroke(), None, path);
+        }
+    }
+
     /// Render a text shape using Parley for proper text layout.
     fn render_text(&mut self, text: &drafftink_core::shapes::Text, transform: Affine) {
         use parley::layout::PositionedLayoutItem;
@@ -820,8 +837,8 @@ impl VelloRenderer {
         
         // Different handle shapes based on type
         match handle.kind {
-            HandleKind::Endpoint(_) => {
-                // Circle handle for endpoints (lines/arrows)
+            HandleKind::Endpoint(_) | HandleKind::IntermediatePoint(_) => {
+                // Circle handle for endpoints and intermediate points (lines/arrows)
                 let radius = size / 2.0;
                 let ellipse = kurbo::Ellipse::new(pos, (radius, radius), 0.0);
                 let path = ellipse.to_path(0.1);
@@ -838,6 +855,30 @@ impl VelloRenderer {
                 // Blue border
                 self.scene.stroke(
                     &Stroke::new(stroke_width_thick),
+                    transform,
+                    self.selection_color,
+                    None,
+                    &path,
+                );
+            }
+            HandleKind::SegmentMidpoint(_) => {
+                // Smaller circle for segment midpoints (virtual handles)
+                let radius = size / 3.0;
+                let ellipse = kurbo::Ellipse::new(pos, (radius, radius), 0.0);
+                let path = ellipse.to_path(0.1);
+                
+                // Light fill
+                self.scene.fill(
+                    Fill::NonZero,
+                    transform,
+                    Color::from_rgba8(200, 220, 255, 200),
+                    None,
+                    &path,
+                );
+                
+                // Blue border
+                self.scene.stroke(
+                    &Stroke::new(stroke_width_thin),
                     transform,
                     self.selection_color,
                     None,
@@ -1343,6 +1384,11 @@ impl ShapeRenderer for VelloRenderer {
             }
             Shape::Image(image) => {
                 self.render_image(image, transform);
+            }
+            Shape::Line(_) | Shape::Arrow(_) => {
+                // Lines and arrows have no fill
+                let path = shape.to_path();
+                self.render_stroke_only(&path, shape.style(), transform);
             }
             _ => {
                 let path = shape.to_path();

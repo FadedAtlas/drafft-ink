@@ -177,7 +177,23 @@ impl ShapeTrait for Arrow {
 
     fn to_path(&self) -> BezPath {
         let mut path = BezPath::new();
-        let points = self.all_points();
+
+        if self.start == self.end {
+            return path;
+        }
+
+        // Get points to draw
+        let points = match self.path_style {
+            PathStyle::Angular if self.intermediate_points.is_empty() => {
+                // Compute elbow path dynamically
+                let elbow_pts = crate::elbow::compute_elbow_path(self.start, self.end);
+                let mut pts = vec![self.start];
+                pts.extend(elbow_pts);
+                pts.push(self.end);
+                pts
+            }
+            _ => self.all_points(),
+        };
 
         if points.len() < 2 {
             return path;
@@ -214,8 +230,17 @@ impl ShapeTrait for Arrow {
             }
         }
 
-        // Arrowhead
-        let dir = self.direction();
+        // Arrowhead - compute direction from last segment
+        let last_pt = points[points.len() - 1];
+        let prev_pt = points[points.len() - 2];
+        let dx = last_pt.x - prev_pt.x;
+        let dy = last_pt.y - prev_pt.y;
+        let len = (dx * dx + dy * dy).sqrt();
+        let dir = if len > f64::EPSILON {
+            Vec2::new(dx / len, dy / len)
+        } else {
+            self.direction()
+        };
         let perp = Vec2::new(-dir.y, dir.x);
 
         let head_back = Point::new(

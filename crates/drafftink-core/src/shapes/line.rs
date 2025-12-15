@@ -133,7 +133,23 @@ impl ShapeTrait for Line {
 
     fn to_path(&self) -> BezPath {
         let mut path = BezPath::new();
-        let points = self.all_points();
+        
+        if self.start == self.end {
+            return path;
+        }
+
+        // Get points to draw
+        let points = match self.path_style {
+            PathStyle::Angular if self.intermediate_points.is_empty() => {
+                // Compute elbow path dynamically
+                let elbow_pts = crate::elbow::compute_elbow_path(self.start, self.end);
+                let mut pts = vec![self.start];
+                pts.extend(elbow_pts);
+                pts.push(self.end);
+                pts
+            }
+            _ => self.all_points(),
+        };
         
         if points.len() < 2 {
             return path;
@@ -143,7 +159,6 @@ impl ShapeTrait for Line {
         
         match self.path_style {
             PathStyle::Direct | PathStyle::Angular => {
-                // Simple polyline (Angular already has right-angle points from excalidraw)
                 for p in &points[1..] {
                     path.line_to(*p);
                 }

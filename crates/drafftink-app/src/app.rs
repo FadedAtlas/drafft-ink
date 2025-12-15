@@ -1854,7 +1854,10 @@ impl ApplicationHandler for App {
                     // Show panel for new shapes with current style settings
                     selected_props.is_drawing_tool = true;
                     selected_props.tool_is_rectangle = current_tool == ToolKind::Rectangle;
+                    selected_props.is_line = current_tool == ToolKind::Line;
+                    selected_props.is_arrow = current_tool == ToolKind::Arrow;
                     selected_props.sloppiness = state.ui_state.to_shape_style().sloppiness as u8;
+                    selected_props.path_style = state.ui_state.path_style;
                     // Use UI state corner radius for new rectangles
                     selected_props.corner_radius = state.ui_state.corner_radius;
                 }
@@ -2184,13 +2187,26 @@ impl ApplicationHandler for App {
                                     1 => PathStyle::Flowing,
                                     _ => PathStyle::Angular,
                                 };
+                                // Always update UI state for new shapes
+                                state.ui_state.path_style = level;
                                 let has_selection = !state.canvas.selection.is_empty();
                                 // Apply to selected lines/arrows
                                 for &shape_id in &state.canvas.selection.clone() {
                                     if let Some(shape) = state.canvas.document.get_shape_mut(shape_id) {
                                         match shape {
-                                            Shape::Line(line) => line.path_style = path_style,
-                                            Shape::Arrow(arrow) => arrow.path_style = path_style,
+                                            Shape::Line(line) => {
+                                                line.path_style = path_style;
+                                                // Angular recomputes path, clear intermediate points
+                                                if path_style == PathStyle::Angular {
+                                                    line.intermediate_points.clear();
+                                                }
+                                            }
+                                            Shape::Arrow(arrow) => {
+                                                arrow.path_style = path_style;
+                                                if path_style == PathStyle::Angular {
+                                                    arrow.intermediate_points.clear();
+                                                }
+                                            }
                                             _ => {}
                                         }
                                     }

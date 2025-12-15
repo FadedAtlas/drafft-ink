@@ -6,6 +6,7 @@ pub mod camera;
 pub mod canvas;
 pub mod collaboration;
 pub mod crdt;
+pub mod elbow;
 pub mod input;
 pub mod selection;
 pub mod shapes;

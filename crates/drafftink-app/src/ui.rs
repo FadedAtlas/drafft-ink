@@ -169,6 +169,8 @@ pub struct UiState {
     pub sloppiness: drafftink_core::shapes::Sloppiness,
     /// Current corner radius for new rectangles.
     pub corner_radius: f32,
+    /// Current path style for new lines/arrows (0=Direct, 1=Flowing, 2=Angular).
+    pub path_style: u8,
     // Collaboration state
     /// WebSocket connection state.
     pub connection_state: ConnectionState,
@@ -216,7 +218,7 @@ impl Default for UiState {
     fn default() -> Self {
         Self {
             current_tool: ToolKind::Select,
-            stroke_color: TAILWIND_COLORS[11].shades[5], // Indigo 500
+            stroke_color: TAILWIND_COLORS[11].shades[6], // Indigo 500
             fill_color: None,
             stroke_width: 2.0,
             selection_count: 0,
@@ -229,6 +231,7 @@ impl Default for UiState {
             export_scale: 2, // Default to 2x for good quality
             sloppiness: drafftink_core::shapes::Sloppiness::Artist,
             corner_radius: 0.0, // Sharp corners by default
+            path_style: 0, // Direct by default
             // Collaboration defaults
             connection_state: ConnectionState::Disconnected,
             current_room: None,
@@ -760,7 +763,7 @@ fn render_properties_panel(ctx: &Context, ui_state: &mut UiState) -> Option<UiAc
                             
                             // Quick colors (500-level for strokes)
                             for &idx in QUICK_COLORS {
-                                let color = TAILWIND_COLORS[idx].shades[5]; // 500-level
+                                let color = TAILWIND_COLORS[idx].shades[6]; // 500-level
                                 let is_selected = ui_state.stroke_color == color;
                                 if color_swatch_selectable(ui, color, TAILWIND_COLORS[idx].name, is_selected) {
                                     action = Some(UiAction::SetStrokeColor(color));

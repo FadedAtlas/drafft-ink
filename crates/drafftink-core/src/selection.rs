@@ -14,6 +14,10 @@ pub const HANDLE_HIT_TOLERANCE: f64 = 24.0;
 pub enum HandleKind {
     /// Endpoint handle for lines/arrows (index 0 = start, 1 = end).
     Endpoint(usize),
+    /// Intermediate point handle for lines/arrows (index into intermediate_points).
+    IntermediatePoint(usize),
+    /// Virtual midpoint handle for splitting a segment (index = segment index).
+    SegmentMidpoint(usize),
     /// Corner handle for rectangles/ellipses.
     Corner(Corner),
     /// Edge midpoint handle for rectangles/ellipses (for resizing).
@@ -66,14 +70,43 @@ impl Handle {
 /// Get the selection handles for a shape.
 pub fn get_handles(shape: &Shape) -> Vec<Handle> {
     match shape {
-        Shape::Line(line) => vec![
-            Handle::new(line.start, HandleKind::Endpoint(0)),
-            Handle::new(line.end, HandleKind::Endpoint(1)),
-        ],
-        Shape::Arrow(arrow) => vec![
-            Handle::new(arrow.start, HandleKind::Endpoint(0)),
-            Handle::new(arrow.end, HandleKind::Endpoint(1)),
-        ],
+        Shape::Line(line) => {
+            let all_pts = line.all_points();
+            let mut handles = Vec::new();
+            // Add endpoint and intermediate point handles
+            handles.push(Handle::new(line.start, HandleKind::Endpoint(0)));
+            for (i, &pt) in line.intermediate_points.iter().enumerate() {
+                handles.push(Handle::new(pt, HandleKind::IntermediatePoint(i)));
+            }
+            handles.push(Handle::new(line.end, HandleKind::Endpoint(1)));
+            // Add segment midpoint handles
+            for i in 0..all_pts.len() - 1 {
+                let mid = Point::new(
+                    (all_pts[i].x + all_pts[i + 1].x) / 2.0,
+                    (all_pts[i].y + all_pts[i + 1].y) / 2.0,
+                );
+                handles.push(Handle::new(mid, HandleKind::SegmentMidpoint(i)));
+            }
+            handles
+        }
+        Shape::Arrow(arrow) => {
+            let all_pts = arrow.all_points();
+            let mut handles = Vec::new();
+            handles.push(Handle::new(arrow.start, HandleKind::Endpoint(0)));
+            for (i, &pt) in arrow.intermediate_points.iter().enumerate() {
+                handles.push(Handle::new(pt, HandleKind::IntermediatePoint(i)));
+            }
+            handles.push(Handle::new(arrow.end, HandleKind::Endpoint(1)));
+            // Add segment midpoint handles
+            for i in 0..all_pts.len() - 1 {
+                let mid = Point::new(
+                    (all_pts[i].x + all_pts[i + 1].x) / 2.0,
+                    (all_pts[i].y + all_pts[i + 1].y) / 2.0,
+                );
+                handles.push(Handle::new(mid, HandleKind::SegmentMidpoint(i)));
+            }
+            handles
+        }
         Shape::Rectangle(_) | Shape::Ellipse(_) => {
             let bounds = shape.bounds();
             corner_handles(bounds)
@@ -243,6 +276,30 @@ pub fn get_manipulation_target_position(shape: &Shape, handle: Option<HandleKind
                 _ => shape.bounds().center(),
             }
         }
+        Some(HandleKind::IntermediatePoint(idx)) => {
+            match shape {
+                Shape::Line(line) => line.intermediate_points.get(idx).copied().unwrap_or(line.start),
+                Shape::Arrow(arrow) => arrow.intermediate_points.get(idx).copied().unwrap_or(arrow.start),
+                _ => shape.bounds().center(),
+            }
+        }
+        Some(HandleKind::SegmentMidpoint(seg_idx)) => {
+            match shape {
+                Shape::Line(line) => {
+                    let pts = line.all_points();
+                    if seg_idx < pts.len() - 1 {
+                        Point::new((pts[seg_idx].x + pts[seg_idx + 1].x) / 2.0, (pts[seg_idx].y + pts[seg_idx + 1].y) / 2.0)
+                    } else { line.start }
+                }
+                Shape::Arrow(arrow) => {
+                    let pts = arrow.all_points();
+                    if seg_idx < pts.len() - 1 {
+                        Point::new((pts[seg_idx].x + pts[seg_idx + 1].x) / 2.0, (pts[seg_idx].y + pts[seg_idx + 1].y) / 2.0)
+                    } else { arrow.start }
+                }
+                _ => shape.bounds().center(),
+            }
+        }
         Some(HandleKind::Corner(corner)) => {
             let bounds = shape.bounds();
             match corner {
@@ -295,6 +352,52 @@ pub fn apply_manipulation(shape: &Shape, handle: Option<HandleKind>, delta: kurb
                     } else {
                         arrow.end.x += delta.x;
                         arrow.end.y += delta.y;
+                    }
+                }
+                _ => {}
+            }
+        }
+        Some(HandleKind::IntermediatePoint(idx)) => {
+            // Move an intermediate point (for lines/arrows)
+            match &mut shape {
+                Shape::Line(line) => {
+                    if let Some(pt) = line.intermediate_points.get_mut(idx) {
+                        pt.x += delta.x;
+                        pt.y += delta.y;
+                    }
+                }
+                Shape::Arrow(arrow) => {
+                    if let Some(pt) = arrow.intermediate_points.get_mut(idx) {
+                        pt.x += delta.x;
+                        pt.y += delta.y;
+                    }
+                }
+                _ => {}
+            }
+        }
+        Some(HandleKind::SegmentMidpoint(seg_idx)) => {
+            // Insert a new point at the segment midpoint and move it
+            match &mut shape {
+                Shape::Line(line) => {
+                    let pts = line.all_points();
+                    if seg_idx < pts.len() - 1 {
+                        let mid = Point::new(
+                            (pts[seg_idx].x + pts[seg_idx + 1].x) / 2.0 + delta.x,
+                            (pts[seg_idx].y + pts[seg_idx + 1].y) / 2.0 + delta.y,
+                        );
+                        // seg_idx 0 means between start and first intermediate (or end)
+                        // Insert at position seg_idx in intermediate_points
+                        line.intermediate_points.insert(seg_idx, mid);
+                    }
+                }
+                Shape::Arrow(arrow) => {
+                    let pts = arrow.all_points();
+                    if seg_idx < pts.len() - 1 {
+                        let mid = Point::new(
+                            (pts[seg_idx].x + pts[seg_idx + 1].x) / 2.0 + delta.x,
+                            (pts[seg_idx].y + pts[seg_idx + 1].y) / 2.0 + delta.y,
+                        );
+                        arrow.intermediate_points.insert(seg_idx, mid);
                     }
                 }
                 _ => {}
