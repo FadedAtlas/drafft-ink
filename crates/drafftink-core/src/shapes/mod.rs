@@ -79,6 +79,8 @@ pub enum Sloppiness {
     Artist = 1,
     /// High roughness - very sketchy, cartoon-like (roughness = 2)
     Cartoonist = 2,
+    /// Extreme roughness - chaotic, wild strokes (roughness = 3.5)
+    Drunk = 3,
 }
 
 impl Sloppiness {
@@ -88,6 +90,7 @@ impl Sloppiness {
             Sloppiness::Architect => 0.0,
             Sloppiness::Artist => 1.0,
             Sloppiness::Cartoonist => 2.0,
+            Sloppiness::Drunk => 3.5,
         }
     }
 
@@ -96,7 +99,8 @@ impl Sloppiness {
         match self {
             Sloppiness::Architect => Sloppiness::Artist,
             Sloppiness::Artist => Sloppiness::Cartoonist,
-            Sloppiness::Cartoonist => Sloppiness::Architect,
+            Sloppiness::Cartoonist => Sloppiness::Drunk,
+            Sloppiness::Drunk => Sloppiness::Architect,
         }
     }
 }

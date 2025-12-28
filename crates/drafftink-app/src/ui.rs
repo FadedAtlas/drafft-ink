@@ -1184,6 +1184,12 @@ fn render_right_panel(ctx: &Context, props: &SelectedShapeProps) -> Option<UiAct
                                 if ToggleButton::new("Cartoonist", is_cartoonist).show(ui) && !is_cartoonist {
                                     action = Some(UiAction::SetSloppiness(2));
                                 }
+                                
+                                // Drunk = 3 (chaotic)
+                                let is_drunk = props.sloppiness == 3;
+                                if ToggleButton::new("Drunk", is_drunk).show(ui) && !is_drunk {
+                                    action = Some(UiAction::SetSloppiness(3));
+                                }
                             });
                         }
                         

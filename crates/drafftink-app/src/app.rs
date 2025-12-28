@@ -2153,7 +2153,8 @@ impl ApplicationHandler for App {
                                 let sloppiness = match level {
                                     0 => Sloppiness::Architect,
                                     1 => Sloppiness::Artist,
-                                    _ => Sloppiness::Cartoonist,
+                                    2 => Sloppiness::Cartoonist,
+                                    _ => Sloppiness::Drunk,
                                 };
                                 // Update UI state (for new shapes)
                                 state.ui_state.sloppiness = sloppiness;

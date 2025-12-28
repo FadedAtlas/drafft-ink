@@ -532,6 +532,7 @@ fn sloppiness_to_i64(s: Sloppiness) -> i64 {
         Sloppiness::Architect => 0,
         Sloppiness::Artist => 1,
         Sloppiness::Cartoonist => 2,
+        Sloppiness::Drunk => 3,
     }
 }
 
@@ -539,7 +540,8 @@ fn i64_to_sloppiness(v: i64) -> Sloppiness {
     match v {
         0 => Sloppiness::Architect,
         1 => Sloppiness::Artist,
-        _ => Sloppiness::Cartoonist,
+        2 => Sloppiness::Cartoonist,
+        _ => Sloppiness::Drunk,
     }
 }
 
