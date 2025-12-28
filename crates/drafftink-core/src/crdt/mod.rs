@@ -30,7 +30,7 @@ pub use loro::{VersionVector, ExportMode};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shapes::{Rectangle, Shape, ShapeStyle, SerializableColor, Sloppiness};
+    use crate::shapes::{Rectangle, Shape, ShapeStyle, SerializableColor, Sloppiness, FillPattern};
     use kurbo::Point;
 
     #[test]
@@ -62,6 +62,7 @@ mod tests {
             stroke_color: SerializableColor::new(255, 0, 0, 255),
             stroke_width: 3.0,
             fill_color: Some(SerializableColor::new(0, 255, 0, 128)),
+            fill_pattern: FillPattern::default(),
             sloppiness: Sloppiness::Artist,
             seed: 12345, // Fixed seed for testing
         };

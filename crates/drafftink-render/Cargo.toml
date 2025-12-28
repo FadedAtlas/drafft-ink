@@ -26,9 +26,9 @@ vello = { workspace = true, optional = true }
 parley = { version = "0.7", optional = true, default-features = false, features = ["std"] }
 
 
-# Rough style rendering (currently incompatible with vello 0.6)
-# roughr = { workspace = true, optional = true }
-# rough_vello = { workspace = true, optional = true }
+# Rough style rendering (rough_vello requires vello 0.5, we use 0.6)
+roughr = { workspace = true }
+# rough_vello = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-time = "1.1"
