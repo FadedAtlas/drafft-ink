@@ -1,6 +1,8 @@
 # Drafft.ink – Infinite Canvas. Zero Subscription.
 > Designed for collaboration, not for venture capitalists.
 
+**🌐 Try it now: [drafft.ink](https://drafft.ink/)**
+
 ## What in the Actual Drafft is This?
 
 <img src="./logo.png" alt="Drafft.ink Logo" width="150" align="left">
@@ -68,6 +70,22 @@ The WebGPU version is hosted, so you can just go to **drafft.ink**. To build and
 ```bash
 # Builds the WASM target and serves it locally for testing
 ./build.sh --wasm
+```
+
+### Collaboration Server
+
+To enable real-time collaboration, start the relay server:
+
+```bash
+# Build and run the collaboration server
+cargo build --release -p drafftink-server
+./target/release/drafftink-server
+```
+
+The server will start listening:
+```
+DrafftInk relay server listening on 0.0.0.0:3030
+WebSocket endpoint: ws://localhost:3030/ws
 ```
 
 -----
