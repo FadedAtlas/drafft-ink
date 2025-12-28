@@ -146,6 +146,11 @@ impl Text {
         }
     }
 
+    /// Reconstruct a text with a specific ID (for CRDT/storage).
+    pub(crate) fn reconstruct(id: ShapeId, position: Point, content: String, font_size: f64, font_family: FontFamily, font_weight: FontWeight, style: ShapeStyle) -> Self {
+        Self { id, position, content, font_size, font_family, font_weight, style, cached_size: RwLock::new(None) }
+    }
+
     /// Create a new text shape with font size.
     pub fn with_font_size(mut self, size: f64) -> Self {
         self.font_size = size;

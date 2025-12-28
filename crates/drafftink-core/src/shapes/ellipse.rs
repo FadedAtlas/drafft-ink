@@ -31,6 +31,11 @@ impl Ellipse {
         }
     }
 
+    /// Reconstruct an ellipse with a specific ID (for CRDT/storage).
+    pub(crate) fn reconstruct(id: ShapeId, center: Point, radius_x: f64, radius_y: f64, style: ShapeStyle) -> Self {
+        Self { id, center, radius_x, radius_y, style }
+    }
+
     /// Create a circle.
     pub fn circle(center: Point, radius: f64) -> Self {
         Self::new(center, radius, radius)

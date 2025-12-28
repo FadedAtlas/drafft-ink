@@ -42,6 +42,11 @@ impl Rectangle {
         }
     }
 
+    /// Reconstruct a rectangle with a specific ID (for CRDT/storage).
+    pub(crate) fn reconstruct(id: ShapeId, position: Point, width: f64, height: f64, corner_radius: f64, style: ShapeStyle) -> Self {
+        Self { id, position, width, height, corner_radius, style }
+    }
+
     /// Create a rectangle from two corner points.
     pub fn from_corners(p1: Point, p2: Point) -> Self {
         let min_x = p1.x.min(p2.x);

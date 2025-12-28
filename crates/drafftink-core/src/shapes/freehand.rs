@@ -34,6 +34,11 @@ impl Freehand {
         }
     }
 
+    /// Reconstruct a freehand with a specific ID (for CRDT/storage).
+    pub(crate) fn reconstruct(id: ShapeId, points: Vec<Point>, style: ShapeStyle) -> Self {
+        Self { id, points, style }
+    }
+
     /// Add a point to the path.
     pub fn add_point(&mut self, point: Point) {
         self.points.push(point);

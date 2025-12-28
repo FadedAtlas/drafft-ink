@@ -115,6 +115,11 @@ impl Image {
         }
     }
     
+    /// Reconstruct an image with a specific ID (for CRDT/storage).
+    pub(crate) fn reconstruct(id: ShapeId, position: Point, width: f64, height: f64, source_width: u32, source_height: u32, format: ImageFormat, data_base64: String, style: ShapeStyle) -> Self {
+        Self { id, position, width, height, source_width, source_height, format, data_base64, style }
+    }
+
     /// Create an image shape with specific display dimensions.
     pub fn with_size(mut self, width: f64, height: f64) -> Self {
         self.width = width;

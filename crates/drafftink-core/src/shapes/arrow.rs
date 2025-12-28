@@ -40,6 +40,11 @@ impl Arrow {
         }
     }
 
+    /// Reconstruct an arrow with a specific ID (for CRDT/storage).
+    pub(crate) fn reconstruct(id: ShapeId, start: Point, end: Point, intermediate_points: Vec<Point>, path_style: PathStyle, head_size: f64, style: ShapeStyle) -> Self {
+        Self { id, start, end, intermediate_points, path_style, head_size, style }
+    }
+
     /// Create an arrow from multiple points.
     pub fn from_points(points: Vec<Point>, path_style: PathStyle) -> Self {
         let start = points.first().copied().unwrap_or(Point::ZERO);

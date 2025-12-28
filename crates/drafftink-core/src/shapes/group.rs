@@ -26,13 +26,9 @@ impl Group {
         }
     }
     
-    /// Create a new group with a specific ID.
-    pub fn with_id(id: ShapeId, children: Vec<Shape>) -> Self {
-        Self {
-            id,
-            children,
-            style: ShapeStyle::default(),
-        }
+    /// Reconstruct a group with a specific ID (for CRDT/storage).
+    pub(crate) fn reconstruct(id: ShapeId, children: Vec<Shape>) -> Self {
+        Self { id, children, style: ShapeStyle::default() }
     }
 
     /// Get the children of this group.

@@ -48,6 +48,11 @@ impl Line {
         }
     }
 
+    /// Reconstruct a line with a specific ID (for CRDT/storage).
+    pub(crate) fn reconstruct(id: ShapeId, start: Point, end: Point, intermediate_points: Vec<Point>, path_style: PathStyle, style: ShapeStyle) -> Self {
+        Self { id, start, end, intermediate_points, path_style, style }
+    }
+
     /// Create a polyline from multiple points.
     pub fn from_points(points: Vec<Point>, path_style: PathStyle) -> Self {
         let start = points.first().copied().unwrap_or(Point::ZERO);
