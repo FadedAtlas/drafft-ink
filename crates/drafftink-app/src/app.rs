@@ -2994,11 +2994,14 @@ impl ApplicationHandler for App {
                 
                 // Update cursor based on hover position (only when not dragging)
                 if !state.input.is_button_pressed(MouseButton::Left) {
-                    let cursor_type = state.event_handler.get_cursor_for_position(&state.canvas, world_point);
-                    let cursor = match cursor_type {
-                        1 => CursorIcon::Move,
-                        2 => CursorIcon::NwseResize,
-                        _ => CursorIcon::Default,
+                    use drafftink_core::selection::{HandleKind, Corner};
+                    let cursor = match state.event_handler.get_cursor_for_position(&state.canvas, world_point) {
+                        Some(Some(HandleKind::Corner(Corner::TopLeft | Corner::BottomRight))) => CursorIcon::NwseResize,
+                        Some(Some(HandleKind::Corner(Corner::TopRight | Corner::BottomLeft))) => CursorIcon::NeswResize,
+                        Some(Some(HandleKind::Edge(_))) => CursorIcon::EwResize,
+                        Some(Some(HandleKind::Endpoint(_) | HandleKind::IntermediatePoint(_) | HandleKind::SegmentMidpoint(_))) => CursorIcon::Crosshair,
+                        Some(None) => CursorIcon::Move,
+                        None => CursorIcon::Default,
                     };
                     state.window.set_cursor(cursor);
                 }

@@ -202,46 +202,41 @@ impl EventHandler {
     }
 
     /// Determine the cursor type based on hover position.
-    /// Returns: 0 = default, 1 = move/drag, 2 = scale (corner resize)
-    pub fn get_cursor_for_position(&self, canvas: &Canvas, world_point: Point) -> u8 {
+    /// Returns: None = default, Some(None) = move, Some(Some(handle)) = resize with direction
+    pub fn get_cursor_for_position(&self, canvas: &Canvas, world_point: Point) -> Option<Option<HandleKind>> {
         let handle_tolerance = HANDLE_HIT_TOLERANCE / canvas.camera.zoom;
         let boundary_tolerance = 8.0 / canvas.camera.zoom;
         
         match canvas.tool_manager.current_tool {
             ToolKind::Text => {
-                // Check text shapes for handle/boundary hits
                 let hits = canvas.document.shapes_at_point(world_point, 5.0 / canvas.camera.zoom);
                 if let Some(&id) = hits.first() {
                     if let Some(shape @ Shape::Text(_)) = canvas.document.get_shape(id) {
-                        // Check handles first (scale cursor)
-                        if hit_test_handles(shape, world_point, handle_tolerance).is_some() {
-                            return 2; // scale
+                        if let Some(handle) = hit_test_handles(shape, world_point, handle_tolerance) {
+                            return Some(Some(handle));
                         }
-                        // Check boundary (move cursor)
                         if hit_test_boundary(shape, world_point, boundary_tolerance) {
-                            return 1; // move
+                            return Some(None); // move
                         }
                     }
                 }
             }
             ToolKind::Select => {
-                // Check selected shapes for handle hits
                 for &shape_id in &canvas.selection {
                     if let Some(shape) = canvas.document.get_shape(shape_id) {
-                        if hit_test_handles(shape, world_point, handle_tolerance).is_some() {
-                            return 2; // scale
+                        if let Some(handle) = hit_test_handles(shape, world_point, handle_tolerance) {
+                            return Some(Some(handle));
                         }
                     }
                 }
-                // Check if hovering over a shape (move cursor)
                 let hits = canvas.document.shapes_at_point(world_point, 5.0 / canvas.camera.zoom);
                 if !hits.is_empty() {
-                    return 1; // move
+                    return Some(None); // move
                 }
             }
             _ => {}
         }
-        0 // default
+        None
     }
 
     /// Handle a press event (mouse down).
