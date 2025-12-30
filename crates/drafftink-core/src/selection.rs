@@ -168,6 +168,15 @@ pub fn hit_test_handles(shape: &Shape, point: Point, tolerance: f64) -> Option<H
     None
 }
 
+/// Check if a point is on the boundary (edge) of a shape's bounding box.
+/// Returns true if the point is within tolerance of any edge but not inside the interior.
+pub fn hit_test_boundary(shape: &Shape, point: Point, tolerance: f64) -> bool {
+    let bounds = shape.bounds();
+    let outer = bounds.inflate(tolerance, tolerance);
+    let inner = bounds.inset(tolerance.min(bounds.width() / 2.0).min(bounds.height() / 2.0));
+    outer.contains(point) && !inner.contains(point)
+}
+
 /// State of an active manipulation operation (single shape with handle).
 #[derive(Debug, Clone)]
 pub struct ManipulationState {

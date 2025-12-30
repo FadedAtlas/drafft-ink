@@ -4,7 +4,7 @@ use kurbo::{Point, Rect};
 use drafftink_core::canvas::Canvas;
 use drafftink_core::input::InputState;
 use drafftink_core::selection::{
-    apply_manipulation, get_manipulation_target_position, hit_test_handles, ManipulationState, MultiMoveState, HANDLE_HIT_TOLERANCE,
+    apply_manipulation, get_manipulation_target_position, hit_test_handles, hit_test_boundary, ManipulationState, MultiMoveState, HANDLE_HIT_TOLERANCE,
 };
 use drafftink_core::shapes::{Freehand, Shape, ShapeId, ShapeStyle, Text};
 use drafftink_core::selection::HandleKind;
@@ -201,6 +201,49 @@ impl EventHandler {
         self.editing_text.is_some()
     }
 
+    /// Determine the cursor type based on hover position.
+    /// Returns: 0 = default, 1 = move/drag, 2 = scale (corner resize)
+    pub fn get_cursor_for_position(&self, canvas: &Canvas, world_point: Point) -> u8 {
+        let handle_tolerance = HANDLE_HIT_TOLERANCE / canvas.camera.zoom;
+        let boundary_tolerance = 8.0 / canvas.camera.zoom;
+        
+        match canvas.tool_manager.current_tool {
+            ToolKind::Text => {
+                // Check text shapes for handle/boundary hits
+                let hits = canvas.document.shapes_at_point(world_point, 5.0 / canvas.camera.zoom);
+                if let Some(&id) = hits.first() {
+                    if let Some(shape @ Shape::Text(_)) = canvas.document.get_shape(id) {
+                        // Check handles first (scale cursor)
+                        if hit_test_handles(shape, world_point, handle_tolerance).is_some() {
+                            return 2; // scale
+                        }
+                        // Check boundary (move cursor)
+                        if hit_test_boundary(shape, world_point, boundary_tolerance) {
+                            return 1; // move
+                        }
+                    }
+                }
+            }
+            ToolKind::Select => {
+                // Check selected shapes for handle hits
+                for &shape_id in &canvas.selection {
+                    if let Some(shape) = canvas.document.get_shape(shape_id) {
+                        if hit_test_handles(shape, world_point, handle_tolerance).is_some() {
+                            return 2; // scale
+                        }
+                    }
+                }
+                // Check if hovering over a shape (move cursor)
+                let hits = canvas.document.shapes_at_point(world_point, 5.0 / canvas.camera.zoom);
+                if !hits.is_empty() {
+                    return 1; // move
+                }
+            }
+            _ => {}
+        }
+        0 // default
+    }
+
     /// Handle a press event (mouse down).
     /// `snap_mode` controls whether the start point should snap to grid.
     pub fn handle_press(&mut self, canvas: &mut Canvas, world_point: Point, input: &InputState, snap_mode: SnapMode) {
@@ -218,14 +261,43 @@ impl EventHandler {
         
         match canvas.tool_manager.current_tool {
             ToolKind::Text => {
-                // Text tool: check if clicking on existing text to edit it
+                // Text tool: check if clicking on existing text
                 let hits = canvas.document.shapes_at_point(world_point, 5.0 / canvas.camera.zoom);
                 if let Some(&id) = hits.first() {
-                    if let Some(Shape::Text(_)) = canvas.document.get_shape(id) {
-                        // Enter text edit mode for existing text
+                    if let Some(shape @ Shape::Text(_)) = canvas.document.get_shape(id) {
+                        let boundary_tolerance = 8.0 / canvas.camera.zoom;
+                        let handle_tolerance = HANDLE_HIT_TOLERANCE / canvas.camera.zoom;
+                        
+                        // Check for handle hit first (for scaling)
+                        if let Some(handle_kind) = hit_test_handles(shape, world_point, handle_tolerance) {
+                            // Start handle manipulation (scale)
+                            self.manipulation = Some(ManipulationState::new(
+                                id,
+                                Some(handle_kind),
+                                world_point,
+                                shape.clone(),
+                            ));
+                            canvas.clear_selection();
+                            canvas.select(id);
+                            return;
+                        }
+                        
+                        // Check for boundary hit (for dragging)
+                        if hit_test_boundary(shape, world_point, boundary_tolerance) {
+                            // Start move operation
+                            let mut original_shapes = std::collections::HashMap::new();
+                            original_shapes.insert(id, shape.clone());
+                            self.multi_move = Some(MultiMoveState::new(world_point, original_shapes));
+                            canvas.clear_selection();
+                            canvas.select(id);
+                            return;
+                        }
+                        
+                        // Click inside text - enter edit mode
                         self.enter_text_edit(canvas, id);
                         canvas.clear_selection();
                         canvas.select(id);
+                        return;
                     }
                 }
                 // If not clicking on text, will create new text on release

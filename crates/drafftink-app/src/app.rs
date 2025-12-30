@@ -21,7 +21,7 @@ use winit::dpi::LogicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
-use winit::window::{Window, WindowId};
+use winit::window::{CursorIcon, Window, WindowId};
 
 use crate::event_handler::EventHandler;
 use crate::ui::{render_ui, SelectedShapeProps, UiAction, UiState};
@@ -2986,10 +2986,22 @@ impl ApplicationHandler for App {
 
                 // Skip canvas processing if egui wants the pointer
                 if egui_wants_input {
+                    state.window.set_cursor(CursorIcon::Default);
                     return;
                 }
 
                 let world_point = state.canvas.camera.screen_to_world(point);
+                
+                // Update cursor based on hover position (only when not dragging)
+                if !state.input.is_button_pressed(MouseButton::Left) {
+                    let cursor_type = state.event_handler.get_cursor_for_position(&state.canvas, world_point);
+                    let cursor = match cursor_type {
+                        1 => CursorIcon::Move,
+                        2 => CursorIcon::NwseResize,
+                        _ => CursorIcon::Default,
+                    };
+                    state.window.set_cursor(cursor);
+                }
                 
                 // Broadcast cursor position to collaborators (throttled)
                 if state.collab.is_in_room() {
