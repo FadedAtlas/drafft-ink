@@ -60,19 +60,64 @@
     <div id="app">
         <div id="loading">
             <div class="spinner"></div>
-            <div>Loading DrafftInk...</div>
+            <div id="loading-text">Loading DrafftInk...</div>
+            <div id="loading-progress" style="font-size: 14px; color: #888; margin-top: 8px;"></div>
         </div>
     </div>
     
     <script type="module">
         import init from './pkg/drafftink_app.js';
         
+        function formatBytes(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+        
         async function run() {
+            const loadingText = document.getElementById('loading-text');
+            const loadingProgress = document.getElementById('loading-progress');
+            
             try {
-                // Initialize WASM module
-                await init();
+                // Fetch WASM with progress
+                const wasmPath = './pkg/drafftink_app_bg.wasm';
+                const response = await fetch(wasmPath);
+                const contentLength = response.headers.get('Content-Length');
+                const total = parseInt(contentLength, 10) || 0;
                 
-                // Remove loading indicator (canvas is created by winit)
+                let loaded = 0;
+                const reader = response.body.getReader();
+                const chunks = [];
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    loaded += value.length;
+                    
+                    if (total > 0) {
+                        const percent = Math.round((loaded / total) * 100);
+                        loadingProgress.textContent = `${percent}% (${formatBytes(loaded)} / ${formatBytes(total)})`;
+                    } else {
+                        loadingProgress.textContent = formatBytes(loaded);
+                    }
+                }
+                
+                // Combine chunks into single array
+                const wasmBytes = new Uint8Array(loaded);
+                let offset = 0;
+                for (const chunk of chunks) {
+                    wasmBytes.set(chunk, offset);
+                    offset += chunk.length;
+                }
+                
+                loadingText.textContent = 'Initializing...';
+                loadingProgress.textContent = '';
+                
+                // Initialize with the fetched WASM bytes
+                await init(wasmBytes);
+                
+                // Remove loading indicator
                 const loading = document.getElementById('loading');
                 if (loading) {
                     loading.remove();
