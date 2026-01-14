@@ -1,18 +1,13 @@
 # Drafft.ink
 
-**An infinite canvas whiteboard that respects your time, your data, and your wallet.**
-
-Try it now: [drafft.ink](https://drafft.ink/)
-
----
-
-## What Is This?
 
 <img src="./logo.png" alt="Drafft.ink Logo" width="120" align="left">
 
-A digital whiteboard built with Rust and WebGPU. Real-time collaboration included. No account required. No subscription fees. No "please upgrade to Pro to unlock the color blue."
+**An infinite canvas whiteboard built with Rust and WebGPU.**
 
-Works on desktop (Linux, Windows, macOS), in your browser, and on mobile. Same codebase, same performance, everywhere.
+Try it now: [drafft.ink](https://drafft.ink/) — draw first, sign up never.
+
+Cross-platform (Linux, Windows, macOS, browser, mobile). Real-time collaboration via CRDTs. No account required. Self-hostable with a single binary.
 
 <br clear="left"/>
 
@@ -20,22 +15,17 @@ Works on desktop (Linux, Windows, macOS), in your browser, and on mobile. Same c
 
 ---
 
-## Why Does This Exist?
-
-Because every whiteboard app eventually asks for your credit card. Because "self-hosted" shouldn't mean "good luck with our 47 microservices." Because somewhere, a PM decided that drawing a rectangle should require a monthly fee.
-
-I wanted a whiteboard I could actually own. It didn't exist, so I built one.
-
----
-
 ## Features
 
-- **Cross-platform** - Native desktop or browser. Pick your poison.
-- **Real-time collaboration** - Watch your colleagues draw boxes around things that don't need boxes.
-- **Touch support** - Works on iPad. Yes, even yours.
-- **Open formats** - Export to PNG or JSON. Import them back. Your data has a passport.
-- **Self-hostable** - One binary. One command. No Kubernetes degree required.
-- **No telemetry** - We don't know what you're drawing, and frankly, we don't want to.
+- **Shapes and Drawing** - Rectangles, ellipses, lines, arrows, freehand paths with pressure sensitivity
+- **Smart Guides** - Smart alignment snapping, equal spacing detection, angle snapping
+- **Text** - Multiple font families (GelPen, GelPen Serif, Vanilla Extract), per-character styling, inline LaTeX math
+- **Images** - Drag-and-drop, paste from clipboard, embedded in document
+- **Collaboration** - Real-time sync via Loro CRDT. Watch your colleagues draw boxes around things that don't need boxes.
+- **Open Formats** - Export to PNG or JSON. Import them back.
+- **No Telemetry** - We don't know what you're drawing, and frankly, we don't want to.
+- **Touch Support** - iPad and tablet friendly, gesture navigation
+- **Sketch Style** - Sketchy on purpose. Precise when it matters. Hand-drawn aesthetic via roughr and fonts
 
 ---
 
@@ -57,8 +47,6 @@ Or use the build script:
 
 ### Web (Local)
 
-The hosted version lives at [drafft.ink](https://drafft.ink/). To run locally:
-
 ```bash
 ./build.sh --wasm
 ```
@@ -70,42 +58,35 @@ cargo build --release -p drafftink-server
 ./target/release/drafftink-server
 ```
 
-Listens on `ws://localhost:3030/ws`. That's it. No YAML files were harmed.
+Listens on `ws://localhost:3030/ws`. One binary, no configuration files. Self-host it. Or don't. We're not your manager.
 
 ---
 
-## Tech Stack
+## Architecture
 
-- **Rust** - Because life is too short for null pointer exceptions.
-- **WebGPU/Vello** - GPU-accelerated 2D rendering. Silky smooth on 4K displays.
-- **egui** - Immediate mode GUI that doesn't fight you.
-- **Loro** - Next-gen CRDT for conflict-free collaboration. Your edits and your coworker's edits can coexist peacefully.
-- **Parley** - Modern text layout engine. Fonts actually render correctly.
-- **roughr** - Hand-drawn sketch style. Because sometimes perfect lines feel wrong.
-- **kurbo** - 2D geometry primitives from the people who know what a Bezier curve actually is.
+```
+crates/
+  drafftink-core/     # Canvas state, shapes, CRDT sync, snapping logic
+  drafftink-render/   # Vello-based GPU rendering, text layout (Parley)
+  drafftink-app/      # Application logic, UI (egui), event handling
+  drafftink-server/   # WebSocket collaboration server
+  drafftink-widgets/  # Custom UI components
+```
 
 ---
 
 ## Philosophy
 
-Your tools should work for you, not the other way around.
-
-This project will never:
-- Require an account to use
-- Hide features behind a paywall
-- Phone home with your data
-- Make you watch an ad before you can draw a rectangle
-- Send you emails about "exciting new features"
-- Pivot to AI-generated sticky notes
+Your tools should work for you. No accounts, no paywalls, no telemetry, no "upgrade to Pro."
 
 ---
 
 ## Contributing
 
-Found a bug? Have an idea? PRs welcome. The code is right here, not behind a sales call.
+PRs welcome. Issues welcome. The code is right here.
 
 ---
 
 ## License
 
-**AGPLv3** - Use it, modify it, host it. Just keep it open.
+**AGPLv3** - Use it, modify it, host it. Keep it open.
