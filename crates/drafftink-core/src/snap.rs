@@ -9,7 +9,7 @@ pub const GRID_SIZE: f64 = 20.0;
 pub const SMART_GUIDE_THRESHOLD: f64 = 8.0;
 
 /// A smart guide line for alignment visualization.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct SmartGuide {
     /// Type of guide.
     pub kind: SmartGuideKind,
@@ -19,6 +19,8 @@ pub struct SmartGuide {
     pub start: f64,
     /// End of the guide line.
     pub end: f64,
+    /// Snap points along the guide (y coords for vertical, x coords for horizontal).
+    pub snap_points: Vec<f64>,
 }
 
 /// Type of smart guide.
@@ -126,12 +128,14 @@ pub fn detect_smart_guides(
                         position: cy,
                         start: a.x1,
                         end: target_between,
+                        snap_points: vec![],
                     });
                     result.guides.push(SmartGuide {
                         kind: SmartGuideKind::EqualSpacingH,
                         position: cy,
                         start: target_between + dragged_w,
                         end: b.x0,
+                        snap_points: vec![],
                     });
                 }
 
@@ -150,12 +154,14 @@ pub fn detect_smart_guides(
                         position: (a.y0 + a.y1) / 2.0,
                         start: a.x1,
                         end: b.x0,
+                        snap_points: vec![],
                     });
                     result.guides.push(SmartGuide {
                         kind: SmartGuideKind::EqualSpacingH,
                         position: cy,
                         start: b.x1,
                         end: target_right,
+                        snap_points: vec![],
                     });
                 }
 
@@ -174,12 +180,14 @@ pub fn detect_smart_guides(
                         position: cy,
                         start: target_left + dragged_w,
                         end: a.x0,
+                        snap_points: vec![],
                     });
                     result.guides.push(SmartGuide {
                         kind: SmartGuideKind::EqualSpacingH,
                         position: (b.y0 + b.y1) / 2.0,
                         start: a.x1,
                         end: b.x0,
+                        snap_points: vec![],
                     });
                 }
             }
@@ -203,12 +211,14 @@ pub fn detect_smart_guides(
                         position: cx,
                         start: a.y1,
                         end: target_between,
+                        snap_points: vec![],
                     });
                     result.guides.push(SmartGuide {
                         kind: SmartGuideKind::EqualSpacingV,
                         position: cx,
                         start: target_between + dragged_h,
                         end: b.y0,
+                        snap_points: vec![],
                     });
                 }
 
@@ -227,12 +237,14 @@ pub fn detect_smart_guides(
                         position: (a.x0 + a.x1) / 2.0,
                         start: a.y1,
                         end: b.y0,
+                        snap_points: vec![],
                     });
                     result.guides.push(SmartGuide {
                         kind: SmartGuideKind::EqualSpacingV,
                         position: cx,
                         start: b.y1,
                         end: target_below,
+                        snap_points: vec![],
                     });
                 }
 
@@ -251,12 +263,14 @@ pub fn detect_smart_guides(
                         position: cx,
                         start: target_above + dragged_h,
                         end: a.y0,
+                        snap_points: vec![],
                     });
                     result.guides.push(SmartGuide {
                         kind: SmartGuideKind::EqualSpacingV,
                         position: (b.x0 + b.x1) / 2.0,
                         start: a.y1,
                         end: b.y0,
+                        snap_points: vec![],
                     });
                 }
             }
@@ -271,11 +285,24 @@ pub fn detect_smart_guides(
         let snapped_y1 = dragged_bounds.y1;
         let min_y = snapped_y0.min(snapped_y1).min(other.y0).min(other.y1);
         let max_y = snapped_y0.max(snapped_y1).max(other.y0).max(other.y1);
+
+        // Collect all y-coords that align at guide_x
+        let mut snap_points = vec![snapped_y0, snapped_y1, dragged_cy];
+        for ob in other_bounds {
+            let ob_cx = (ob.x0 + ob.x1) / 2.0;
+            for ob_x in [ob.x0, ob.x1, ob_cx] {
+                if (ob_x - guide_x).abs() < 0.1 {
+                    snap_points.extend([ob.y0, ob.y1, (ob.y0 + ob.y1) / 2.0]);
+                }
+            }
+        }
+
         result.guides.push(SmartGuide {
             kind: SmartGuideKind::Vertical,
             position: guide_x,
             start: min_y,
             end: max_y,
+            snap_points,
         });
     }
 
@@ -290,11 +317,24 @@ pub fn detect_smart_guides(
         let snapped_x1 = snapped_x0 + dragged_w;
         let min_x = snapped_x0.min(snapped_x1).min(other.x0).min(other.x1);
         let max_x = snapped_x0.max(snapped_x1).max(other.x0).max(other.x1);
+
+        // Collect all x-coords that align at guide_y
+        let mut snap_points = vec![snapped_x0, snapped_x1, snapped_x0 + dragged_w / 2.0];
+        for ob in other_bounds {
+            let ob_cy = (ob.y0 + ob.y1) / 2.0;
+            for ob_y in [ob.y0, ob.y1, ob_cy] {
+                if (ob_y - guide_y).abs() < 0.1 {
+                    snap_points.extend([ob.x0, ob.x1, (ob.x0 + ob.x1) / 2.0]);
+                }
+            }
+        }
+
         result.guides.push(SmartGuide {
             kind: SmartGuideKind::Horizontal,
             position: guide_y,
             start: min_x,
             end: max_x,
+            snap_points,
         });
     }
 
@@ -347,11 +387,24 @@ pub fn detect_smart_guides_for_point(
         result.snapped_x = true;
         let min_y = point.y.min(other_y0).min(other_y1);
         let max_y = point.y.max(other_y0).max(other_y1);
+
+        // Collect snap points
+        let mut snap_points = vec![point.y];
+        for ob in other_bounds {
+            let ob_cx = (ob.x0 + ob.x1) / 2.0;
+            for ob_x in [ob.x0, ob.x1, ob_cx] {
+                if (ob_x - guide_x).abs() < 0.1 {
+                    snap_points.extend([ob.y0, ob.y1, (ob.y0 + ob.y1) / 2.0]);
+                }
+            }
+        }
+
         result.guides.push(SmartGuide {
             kind: SmartGuideKind::Vertical,
             position: guide_x,
             start: min_y,
             end: max_y,
+            snap_points,
         });
     }
 
@@ -365,11 +418,24 @@ pub fn detect_smart_guides_for_point(
         };
         let min_x = snapped_x.min(other_x0).min(other_x1);
         let max_x = snapped_x.max(other_x0).max(other_x1);
+
+        // Collect snap points
+        let mut snap_points = vec![snapped_x];
+        for ob in other_bounds {
+            let ob_cy = (ob.y0 + ob.y1) / 2.0;
+            for ob_y in [ob.y0, ob.y1, ob_cy] {
+                if (ob_y - guide_y).abs() < 0.1 {
+                    snap_points.extend([ob.x0, ob.x1, (ob.x0 + ob.x1) / 2.0]);
+                }
+            }
+        }
+
         result.guides.push(SmartGuide {
             kind: SmartGuideKind::Horizontal,
             position: guide_y,
             start: min_x,
             end: max_x,
+            snap_points,
         });
     }
 
@@ -425,6 +491,7 @@ pub fn snap_ray_to_smart_guides(
                                 position: other_x,
                                 start: min_y,
                                 end: max_y,
+                                snap_points: vec![intersect_y, other.y0, other.y1, other_cy],
                             },
                         ));
                     }
@@ -454,6 +521,7 @@ pub fn snap_ray_to_smart_guides(
                                 position: other_y,
                                 start: min_x,
                                 end: max_x,
+                                snap_points: vec![intersect_x, other.x0, other.x1, other_cx],
                             },
                         ));
                     }

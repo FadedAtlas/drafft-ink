@@ -1576,6 +1576,7 @@ impl VelloRenderer {
         let stroke_width = 1.0 / self.zoom;
         let stroke = Stroke::new(stroke_width);
         let cap_size = 4.0 / self.zoom;
+        let x_size = 3.0 / self.zoom;
 
         for guide in guides {
             let mut path = BezPath::new();
@@ -1583,10 +1584,24 @@ impl VelloRenderer {
                 SmartGuideKind::Vertical => {
                     path.move_to(Point::new(guide.position, guide.start));
                     path.line_to(Point::new(guide.position, guide.end));
+                    // Draw X markers at snap points
+                    for &y in &guide.snap_points {
+                        path.move_to(Point::new(guide.position - x_size, y - x_size));
+                        path.line_to(Point::new(guide.position + x_size, y + x_size));
+                        path.move_to(Point::new(guide.position - x_size, y + x_size));
+                        path.line_to(Point::new(guide.position + x_size, y - x_size));
+                    }
                 }
                 SmartGuideKind::Horizontal => {
                     path.move_to(Point::new(guide.start, guide.position));
                     path.line_to(Point::new(guide.end, guide.position));
+                    // Draw X markers at snap points
+                    for &x in &guide.snap_points {
+                        path.move_to(Point::new(x - x_size, guide.position - x_size));
+                        path.line_to(Point::new(x + x_size, guide.position + x_size));
+                        path.move_to(Point::new(x - x_size, guide.position + x_size));
+                        path.line_to(Point::new(x + x_size, guide.position - x_size));
+                    }
                 }
                 SmartGuideKind::EqualSpacingH => {
                     // Horizontal gap: line with vertical end caps
