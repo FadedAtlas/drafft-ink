@@ -39,6 +39,21 @@ static NOTO_SANS: &[u8] = include_bytes!("../assets/NotoSans-Regular.ttf");
 static NOTO_SANS_BOLD: &[u8] = include_bytes!("../assets/NotoSans-Bold.ttf");
 static NOTO_SANS_ITALIC: &[u8] = include_bytes!("../assets/NotoSans-Italic.ttf");
 
+/// Cached text layout data for rendering.
+#[derive(Clone)]
+struct CachedTextLayout {
+    /// Glyph runs ready for rendering: (font_data, font_size, brush, glyphs, skew_angle)
+    glyph_runs: Vec<(
+        vello::peniko::FontData,
+        f32,
+        Brush,
+        Vec<vello::Glyph>,
+        Option<f64>,
+    )>,
+    width: f64,
+    height: f64,
+}
+
 /// Vello-based renderer for GPU-accelerated 2D graphics.
 pub struct VelloRenderer {
     /// The Vello scene being built.
@@ -57,6 +72,8 @@ pub struct VelloRenderer {
     /// Shape path cache for hand-drawn effects.
     /// Key: (shape_id, seed, stroke_index, roughness_bits, zoom_bucket)
     shape_cache: std::collections::HashMap<(String, u32, u32, u64, i32), BezPath>,
+    /// Text layout cache. Key: (shape_id, content_hash)
+    text_cache: std::collections::HashMap<(String, u64), CachedTextLayout>,
 }
 
 impl Default for VelloRenderer {
@@ -341,6 +358,7 @@ impl VelloRenderer {
             zoom: 1.0,
             image_cache: std::collections::HashMap::new(),
             shape_cache: std::collections::HashMap::new(),
+            text_cache: std::collections::HashMap::new(),
         }
     }
 
@@ -733,10 +751,10 @@ impl VelloRenderer {
     fn render_text(&mut self, text: &drafftink_core::shapes::Text, transform: Affine) {
         use parley::StyleProperty;
         use parley::layout::PositionedLayoutItem;
+        use std::hash::{Hash, Hasher};
 
         // Skip empty text
         if text.content.is_empty() {
-            // Draw a placeholder cursor/caret for empty text (position is top-left)
             let cursor_height = text.font_size * 1.2;
             let cursor = kurbo::Line::new(
                 Point::new(text.position.x, text.position.y),
@@ -755,18 +773,49 @@ impl VelloRenderer {
 
         use drafftink_core::shapes::{FontFamily, FontWeight};
 
+        // Build cache key from content hash
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        text.content.hash(&mut hasher);
+        (text.font_family.clone() as u8).hash(&mut hasher);
+        (text.font_weight.clone() as u8).hash(&mut hasher);
+        text.font_size.to_bits().hash(&mut hasher);
+        text.char_colors.len().hash(&mut hasher);
+        for c in &text.char_colors {
+            c.is_some().hash(&mut hasher);
+            if let Some(color) = c {
+                color.r.hash(&mut hasher);
+                color.g.hash(&mut hasher);
+                color.b.hash(&mut hasher);
+            }
+        }
+        text.style.stroke_color.r.hash(&mut hasher);
+        text.style.stroke_color.g.hash(&mut hasher);
+        text.style.stroke_color.b.hash(&mut hasher);
+        let cache_key = (text.id().to_string(), hasher.finish());
+
+        // Check cache
+        if let Some(cached) = self.text_cache.get(&cache_key) {
+            text.set_cached_size(cached.width, cached.height);
+            let text_transform = transform * Affine::translate((text.position.x, text.position.y));
+
+            for (font_data, font_size, brush, glyphs, skew) in &cached.glyph_runs {
+                let glyph_xform = skew.map(|angle| Affine::skew(angle, 0.0));
+                self.scene
+                    .draw_glyphs(font_data)
+                    .brush(brush)
+                    .hint(true)
+                    .transform(text_transform)
+                    .glyph_transform(glyph_xform)
+                    .font_size(*font_size)
+                    .draw(Fill::NonZero, glyphs.iter().cloned());
+            }
+            return;
+        }
+
         let style = &text.style;
         let brush = Brush::Solid(style.stroke_with_opacity());
         let font_size = text.font_size as f32;
 
-        // Determine font name based on family and weight
-        // Font names must match the name table in the TTF files
-        // For GelPen: each weight is a separate font family (no weight metadata)
-        // For Roboto: Use "Roboto" family with proper weight metadata
-        //   - Roboto-Light.ttf has weight 300 (LIGHT)
-        //   - Roboto-Regular.ttf has weight 400 (NORMAL)
-        //   - Roboto-Bold.ttf has weight 700 (BOLD)
-        // For GelPenSerif: each weight is a separate font family
         let (font_name, parley_weight, is_italic) = match (&text.font_family, &text.font_weight) {
             (FontFamily::GelPen, FontWeight::Light) => {
                 ("GelPenLight", parley::FontWeight::NORMAL, false)
@@ -800,7 +849,6 @@ impl VelloRenderer {
             }
         };
 
-        // Build the layout using cached font context
         let mut builder =
             self.layout_cx
                 .ranged_builder(&mut self.font_cx, &text.content, 1.0, false);
@@ -814,7 +862,6 @@ impl VelloRenderer {
             parley::FontFamily::Named(font_name.into()),
         )));
 
-        // Apply per-character colors
         let mut byte_offset = 0;
         for (char_idx, ch) in text.content.chars().enumerate() {
             if let Some(Some(color)) = text.char_colors.get(char_idx) {
@@ -830,8 +877,6 @@ impl VelloRenderer {
         }
 
         let mut layout = builder.build(&text.content);
-
-        // Compute layout (no max width constraint for now)
         layout.break_all_lines(None);
         layout.align(
             None,
@@ -839,20 +884,15 @@ impl VelloRenderer {
             parley::AlignmentOptions::default(),
         );
 
-        // Cache the computed layout dimensions for accurate bounds
         let layout_width = layout.width() as f64;
         let layout_height = layout.height() as f64;
         text.set_cached_size(layout_width, layout_height);
 
-        // Create transform to position text
-        // text.position is where user clicked - treat as top-left of text box
-        // Parley layouts have y=0 at top, with baseline offset down
         let text_transform = transform * Affine::translate((text.position.x, text.position.y));
 
-        // Count glyphs for debugging
+        let mut cached_runs = Vec::new();
         let mut glyph_count = 0;
 
-        // Render each line (adapted from Parley's vello example)
         for line in layout.lines() {
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
@@ -862,14 +902,13 @@ impl VelloRenderer {
                 let y = glyph_run.baseline();
                 let run = glyph_run.run();
                 let font = run.font();
-                let font_size = run.font_size();
+                let run_font_size = run.font_size();
                 let synthesis = run.synthesis();
-                let glyph_xform = synthesis
+                let skew_angle = synthesis
                     .skew()
-                    .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
-
-                // Get the brush from the glyph run's style (supports per-run colors)
-                let run_brush = &glyph_run.style().brush;
+                    .map(|angle| angle.to_radians().tan() as f64);
+                let glyph_xform = skew_angle.map(|angle| Affine::skew(angle, 0.0));
+                let run_brush = glyph_run.style().brush.clone();
 
                 let glyphs: Vec<vello::Glyph> = glyph_run
                     .glyphs()
@@ -889,20 +928,30 @@ impl VelloRenderer {
                 if !glyphs.is_empty() {
                     self.scene
                         .draw_glyphs(font)
-                        .brush(run_brush)
+                        .brush(&run_brush)
                         .hint(true)
                         .transform(text_transform)
                         .glyph_transform(glyph_xform)
-                        .font_size(font_size)
+                        .font_size(run_font_size)
                         .normalized_coords(run.normalized_coords())
-                        .draw(Fill::NonZero, glyphs.into_iter());
+                        .draw(Fill::NonZero, glyphs.iter().cloned());
+
+                    cached_runs.push((font.clone(), run_font_size, run_brush, glyphs, skew_angle));
                 }
             }
         }
 
-        // If no glyphs were rendered (font not found), draw a fallback rectangle
+        // Cache the layout
+        self.text_cache.insert(
+            cache_key,
+            CachedTextLayout {
+                glyph_runs: cached_runs,
+                width: layout_width,
+                height: layout_height,
+            },
+        );
+
         if glyph_count == 0 {
-            // Approximate bounds (position is top-left)
             let width = text.content.len() as f64 * text.font_size * 0.6;
             let height = text.font_size * 1.2;
             let rect = Rect::new(
