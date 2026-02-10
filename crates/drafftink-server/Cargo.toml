@@ -6,6 +6,10 @@ license.workspace = true
 rust-version.workspace = true
 description = "WebSocket relay server for DrafftInk collaboration"
 
+[lib]
+name = "drafftink_server"
+path = "src/lib.rs"
+
 [[bin]]
 name = "drafftink-server"
 path = "src/main.rs"
